@@ -1,3 +1,5 @@
+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
+
 reset các user mặc định
 apply new sshd config 
 cấu hình tcp wraper allow ssh ip của mình
