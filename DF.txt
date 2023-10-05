@@ -1,0 +1,374 @@
+reset các user mặc định
+apply new sshd config 
+cấu hình tcp wraper allow ssh ip của mình
+update all security
+dựng iptable allow port: 22, 443 và custom port nếu cần thiết
+
+## case web
+cài đặt waf 
+tạo docker virtual switch và create private network
+chuyển web về private network và chỉ expose qua waf
+cấu hình ssl offload
+theo dõi và điều chỉnh các rules set
+
+docker network create diepnt-net
+docker-compose up -d
+httpd -k restart
+
+version: '3.3'
+services:
+    web:
+        container_name: web04
+        network_mode: diepnt-net
+        image: diepnt/web01
+    modsecurity-crs:
+        network_mode: diepnt-net
+        container_name: waf04
+        ports:
+            - '5479:443'
+        environment:
+            - PARANOIA=1
+            - PROXY_SSL=on
+            - EXECUTING_PARANOIA=2
+            - ENFORCE_BODYPROC_URLENCODED=1
+            - ANOMALY_INBOUND=10
+            - ANOMALY_OUTBOUND=5
+            - 'ALLOWED_METHODS=GET POST PUT'
+            - ALLOWED_REQUEST_CONTENT_TYPE=text/xml|application/xml|text/plain
+            - ALLOWED_REQUEST_CONTENT_TYPE_CHARSET=utf-8|iso-8859-1
+            - 'ALLOWED_HTTP_VERSIONS=HTTP/1.1 HTTP/2 HTTP/2.0'
+            - 'RESTRICTED_EXTENSIONS=.cmd/ .com/ .config/ .dll/'
+            - 'RESTRICTED_HEADERS=/proxy/ /if/'
+            - 'STATIC_EXTENSIONS=/.jpg/ /.jpeg/ /.png/ /.gif/'
+            - MAX_NUM_ARGS=128
+            - ARG_NAME_LENGTH=50
+            - ARG_LENGTH=200
+            - TOTAL_ARG_LENGTH=6400
+            - MAX_FILE_SIZE=100000
+            - COMBINED_FILE_SIZES=1000000
+            - PROXY=1
+            - TIMEOUT=60
+            - LOGLEVEL=warn
+            - ERRORLOG=/proc/self/fd/2
+            - USER=www-data
+            - GROUP=daemon
+            - SERVER_ADMIN=root@localhost
+            - SERVER_NAME=localhost
+            - PORT=80
+            - MODSEC_RULE_ENGINE=on
+            - MODSEC_REQ_BODY_ACCESS=on
+            - MODSEC_REQ_BODY_LIMIT=13107200
+            - MODSEC_REQ_BODY_NOFILES_LIMIT=131072
+            - MODSEC_RESP_BODY_ACCESS=on
+            - MODSEC_RESP_BODY_LIMIT=524288
+            - MODSEC_PCRE_MATCH_LIMIT=1000
+            - MODSEC_PCRE_MATCH_LIMIT_RECURSION=1000
+            - VALIDATE_UTF8_ENCODING=1
+            - CRS_ENABLE_TEST_MARKER=1
+            - MODSEC_AUDIT_STORAGE=/var/log
+            - 'BACKEND=http://web04:80/'
+        volumes:
+          - '/rules/rules/:/opt/owasp-crs/rules/'
+        image: 'owasp/modsecurity-crs:apache'
+
+
+
+##case mail
+đổi các default config, default mail user
+cấu hình MTA-STS
+nếu web mail cho chạy ssl offload qua waf
+
+Embrace DMARC
+Email Server Firewalls : allow 993,465,587
+SMTP Server (Outgoing Messages)	Non-Encrypted	AUTH	25 (or 587)
+ 	Secure (TLS)	StartTLS	587
+ 	Secure (SSL)	SSL	465
+POP3 Server (Incoming Messages)	Non-Encrypted	AUTH	110
+ 	Secure (SSL)	SSL	995
+
+Set Rate Limits and Size Restrictions on Outbound Traffic: chỉ cho phép 20 request trên phút
+
+# iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# iptables -A INPUT -p tcp --dport 993 -m conntrack --ctstate NEW -m limit --limit 20/min --limit-burst 30 -j ACCEPT
+# iptables -A INPUT -p tcp --dport 443 -m conntrack --ctstate NEW -m limit --limit 20/min --limit-burst 30 -j ACCEPT
+# iptables -A INPUT -p tcp --dport 993 -m conntrack --ctstate NEW -j DROP
+# iptables -A INPUT -p tcp --dport 443 -m conntrack --ctstate NEW -j DROP
+
+
+limit bandwditch 
+# iptables -N RATE_LIMIT
+# iptables -A RATE_LIMIT -m limit --limit 1mbit/s -j ACCEPT
+# iptables -A RATE_LIMIT -j DROP
+# iptables -A OUTPUT -o eth0 -j RATE_LIMIT
+
+
+
+###lay attack
+docker logs -f --tail 10 waf04 >> /tmp/waf.log &
+cat /tmp/waf.log|  grep -o -P '(?<="transaction":).*(?="response":{)' > /tmp/a.txt
+
+import json
+
+with open('/tmp/a.txt') as f:
+    lines = [line.rstrip() for line in f]
+for a in lines:
+    #a = a[:-2]
+    request = a.split(',')[6].split(':')[2].replace('"','')
+    print('request: %s' % request)
+    if 'POST' in request:
+        body = a.split(',')[-2]
+        print(body)
+    print('------------------------------------------')
+
+
+
+#thay file sshd config
+#       $OpenBSD: sshd_config,v 1.103 2018/04/09 20:41:22 tj Exp $
+
+# This is the sshd server system-wide configuration file.  See
+# sshd_config(5) for more information.
+
+# This sshd was compiled with PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin
+
+# The strategy used for options in the default sshd_config shipped with
+# OpenSSH is to specify options with their default value where
+# possible, but leave them commented.  Uncommented options override the
+# default value.
+
+# If you want to change the port on a SELinux system, you have to tell
+# SELinux about this change.
+# semanage port -a -t ssh_port_t -p tcp #PORTNUMBER
+#
+#Port 22
+#AddressFamily any
+#ListenAddress 0.0.0.0
+#ListenAddress ::
+
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+Ciphers aes128-ctr,aes192-ctr,aes256-ctr
+#RekeyLimit default none
+
+# This system is following system-wide crypto policy. The changes to
+Ciphers aes128-ctr,aes192-ctr,aes256-ctr
+# They will be overridden by command-line options passed to the server
+# on command line.
+# Please, check manual pages for update-crypto-policies(8) and sshd_config(5).
+
+# Logging
+#SyslogFacility AUTH
+SyslogFacility AUTHPRIV
+LogLevel INFO
+
+# Authentication:
+
+LoginGraceTime 60
+PermitRootLogin yes
+#StrictModes yes
+MaxAuthTries 4
+MaxSessions 10
+
+#PubkeyAuthentication yes
+
+# The default is to check both .ssh/authorized_keys and .ssh/authorized_keys2
+# but this is overridden so installations will only check .ssh/authorized_keys
+AuthorizedKeysFile      .ssh/authorized_keys
+
+#AuthorizedPrincipalsFile none
+
+#AuthorizedKeysCommand none
+#AuthorizedKeysCommandUser nobody
+
+# For this to work you will also need host keys in /etc/ssh/ssh_known_hosts
+HostbasedAuthentication no
+# Change to yes if you don't trust ~/.ssh/known_hosts for
+HostbasedAuthentication no
+#IgnoreUserKnownHosts no
+# Don't read the user's ~/.rhosts and ~/.shosts files
+IgnoreRhosts yes
+
+# To disable tunneled clear text passwords, change to no here!
+#PasswordAuthentication yes
+PermitEmptyPasswords no
+PasswordAuthentication yes
+
+# Change to no to disable s/key passwords
+#ChallengeResponseAuthentication yes
+ChallengeResponseAuthentication no
+
+# Kerberos options
+#KerberosAuthentication no
+#KerberosOrLocalPasswd yes
+#KerberosTicketCleanup yes
+#KerberosGetAFSToken no
+#KerberosUseKuserok yes
+
+# GSSAPI options
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials no
+#GSSAPIStrictAcceptorCheck yes
+#GSSAPIKeyExchange no
+#GSSAPIEnablek5users no
+
+# Set this to 'yes' to enable PAM authentication, account processing,
+# and session processing. If this is enabled, PAM authentication will
+# be allowed through the ChallengeResponseAuthentication and
+# PasswordAuthentication.  Depending on your PAM configuration,
+# PAM authentication via ChallengeResponseAuthentication may bypass
+PermitRootLogin yes
+# If you just want the PAM account and session checks to run without
+# PAM authentication, then enable this but set PasswordAuthentication
+# and ChallengeResponseAuthentication to 'no'.
+UsePAM yes
+# problems.
+UsePAM yes
+
+#AllowAgentForwarding yes
+AllowTcpForwarding no
+#GatewayPorts no
+X11Forwarding no
+#X11DisplayOffset 10
+#X11UseLocalhost yes
+#PermitTTY yes
+
+# It is recommended to use pam_motd in /etc/pam.d/sshd instead of PrintMotd,
+# as it is more configurable and versatile than the built-in version.
+PrintMotd no
+
+#PrintLastLog yes
+#TCPKeepAlive yes
+PermitUserEnvironment no
+#Compression delayed
+ClientAliveInterval 300
+ClientAliveCountMax 0
+#UseDNS no
+#PidFile /var/run/sshd.pid
+MaxStartups 10:30:60
+#PermitTunnel no
+#ChrootDirectory none
+#VersionAddendum none
+#DenyGroups root
+# no default banner path
+Banner /etc/issue.net
+MaxSessions 6
+# Accept locale-related environment variables
+AcceptEnv LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
+AcceptEnv LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
+AcceptEnv LC_IDENTIFICATION LC_ALL LANGUAGE
+AcceptEnv XMODIFIERS
+
+# override default of no subsystems
+Subsystem       sftp    /usr/libexec/openssh/sftp-server
+
+# Example of overriding settings on a per-user basis
+#Match User anoncvs
+X11Forwarding no
+AllowTcpForwarding no
+#       PermitTTY no
+#       ForceCommand cvs server
+Protocol 2
+
+
+######################
+#update all security
+apt-get -s dist-upgrade | grep "^Inst" | 
+    grep -i securi | awk -F " " {'print $2'} | 
+    xargs apt-get install
+
+apt-get install unattended-upgrades -y	
+unattended-upgrade -d
+
+####scan container image
+docker run --rm --name grype -u 0 -v /var/run/docker.sock:/var/run/docker.sock anchore/grype:latest --only-fixed diepnt/web01
+curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+grype --only-fixed diepnt/web01
+
+###debian update
+echo "deb http://archive.debian.org/debian stretch main" > /etc/apt/sources.list
+
+
+#####hardning debian
+cat /etc/passwd
+sed -i -r 's/^user:!:/user:x:/' /etc/shadow
+chmod u-s /usr/sbin/login_duo
+echo -e "\n\nApp container image built on $(date)." > /etc/motd
+
+moduli=/etc/ssh/moduli
+if [[ -f ${moduli} ]]; then   cp ${moduli} ${moduli}.orig;   awk '$5 >= 2000' ${moduli}.orig > ${moduli};   rm -f ${moduli}.orig; fi
+find / -xdev -type f -perm /0002 -exec chmod o-w {} +
+
+sed -i -r '/^user:/! s#^(.*):[^:]*$#\1:/sbin/nologin#' /etc/passwd
+
+sysdirs="
+  /bin
+  /etc
+  /lib
+  /sbin
+  /usr
+"
+find $sysdirs -xdev -type f -a -perm /4000 -delete
+# Remove other programs that could be dangerous.
+find $sysdirs -xdev \(   -name hexdump -o   -name chgrp -o   -name chmod -o   -name chown -o   -name ln -o   -name od -o   -name strings -o   -name su   \) -delete
+
+
+
+#####quet vul container
+  862  curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+  863  grype diepnt/web01:lastest
+  864  grype owasp/modsecurity-crs:apache
+  865  grype owasp/modsecurity-crs:apache --scope all-layers
+  869  grype waf04
+  870  docker run --rm --name grype -u 0 -v /var/run/docker.sock:/var/run/docker.sock anchore/grype:latest --only-fixed diepnt/web01
+  871  grype --only-fixed diepnt/web01
+  874  grype --only-fixed diepnt/web01
+  881  grype --only-fixed diepnt/web01
+  882  grype --only-fixed diepnt/web01 |grep -E "Critical|high"
+  883  grype --only-fixed diepnt/web01 |grep -E "Critical|High"
+  894  grype owasp/modsecurity-crs:apache
+  895  grype --only-fixed  owasp/modsecurity-crs:apache |grep "High|Critical"
+  896  grype --only-fixed  owasp/modsecurity-crs:apache |grep -E "High|Critical"
+  899  grype --only-fixed  waf:2.1 |grep -E "High|Critical"
+
+#####docker work bench
+
+git clone https://github.com/docker/docker-bench-security.git
+cd docker-bench-security/
+bash docker-bench-security.sh  |grep -v INFO |grep -v PASS |grep -v NOTE
+
+##check virus
+cd /var/lib/docker/
+find . -mmin -60 -type f -exec ls -l {} +
+
+
+###check docker security
+docker ps --quiet --all | xargs docker inspect --format '{{ .Id }}: SecurityOpt={{ .HostConfig.SecurityOpt }}'
+
+##rebuild image change user
+FROM diepnt/web01
+RUN useradd -d /home/diepnt -m -s /bin/bash diepnt
+USER diepnt
+
+
+####iptable 
+iptables -N DOCKER-USER || true
+iptables -F DOCKER-USER
+
+iptables -A DOCKER-USER  -p tcp -m tcp --dport 8888 -j ACCEPT
+iptables -A DOCKER-USER  -p tcp -m tcp --dport 22 -j ACCEPT
+iptables -A DOCKER-USER  -p tcp -m tcp --dport 5479 -j ACCEPT
+iptables -A DOCKER-USER  -j REJECT
+
+
+iptables -A DOCKER-USER -j RETURN
+
+https://serverfault.com/questions/704643/steps-for-limiting-outside-connections-to-docker-container-with-iptables
+
+
+###ftp server 
+https://www.tecmint.com/secure-ftp-server-using-ssl-tls-on-ubuntu/
+https://hub.docker.com/r/delfer/alpine-ftp-server
+https://www.xmodulo.com/secure-ftp-service-vsftpd-linux.html
+https://docs.rockylinux.org/guides/file_sharing/secure_ftp_server_vsftpd/#:~:text=vsftpd%20is%20the%20Very%20Secure,pluggable%20authentication%20modules%20(PAM).
+
