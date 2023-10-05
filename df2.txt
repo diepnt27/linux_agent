@@ -1,0 +1,443 @@
+cp -a /etc/nginx /etc/nginx-plus-backup
+cp -a /var/log/nginx /var/log/nginx-plus-backup
+mkdir -p /etc/ssl/nginx
+cp nginx-repo.* /etc/ssl/nginx/
+
+apt-get install apt-transport-https lsb-release ca-certificates wget gnupg2 ubuntu-keyring
+
+wget -qO - https://cs.nginx.com/static/keys/nginx_signing.key | gpg --dearmor |  tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+printf "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://pkgs.nginx.com/plus/ubuntu `lsb_release -cs` nginx-plus\n" |  tee /etc/apt/sources.list.d/nginx-plus.list
+wget -P /etc/apt/apt.conf.d https://cs.nginx.com/static/files/90pkgs-nginx
+printf "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://pkgs.nginx.com/modsecurity/ubuntu `lsb_release -cs` nginx-plus\n" |  tee /etc/apt/sources.list.d/nginx-modsecurity.list
+apt-get update
+apt-get install nginx-plus
+apt-get install nginx-plus nginx-plus-module-modsecurity
+
+vim /etc/nginx/nginx.conf
+load_module modules/ngx_http_modsecurity_module.so; 
+cp nginx config to server
+
+
+mkdir /etc/nginx/modsec
+cd /etc/nginx/modsec
+
+wget https://raw.githubusercontent.com/SpiderLabs/ModSecurity/v3/master/modsecurity.conf-recommended
+mv modsecurity.conf-recommended modsecurity.conf
+
+mkdir -p /tmp/modsecurity/data
+mkdir -p /tmp/modsecurity/tmp
+mkdir -p /tmp/modsecurity/upload
+
+service nginx restart
+
+
+
+
+# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy main restricted
+# deb-src http://archive.ubuntu.com/ubuntu/ jammy main restricted
+
+## Major bug fix updates produced after the final release of the
+## distribution.
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted
+# deb-src http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted
+
+## N.B. software from this repository is ENTIRELY UNSUPPORTED by the Ubuntu
+## team. Also, please note that software in universe WILL NOT receive any
+## review or updates from the Ubuntu security team.
+deb http://archive.ubuntu.com/ubuntu/ jammy universe
+# deb-src http://archive.ubuntu.com/ubuntu/ jammy universe
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates universe
+# deb-src http://archive.ubuntu.com/ubuntu/ jammy-updates universe
+
+## N.B. software from this repository is ENTIRELY UNSUPPORTED by the Ubuntu
+## team, and may not be under a free licence. Please satisfy yourself as to
+## your rights to use the software. Also, please note that software in
+## multiverse WILL NOT receive any review or updates from the Ubuntu
+## security team.
+deb http://archive.ubuntu.com/ubuntu/ jammy multiverse
+# deb-src http://archive.ubuntu.com/ubuntu/ jammy multiverse
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates multiverse
+# deb-src http://archive.ubuntu.com/ubuntu/ jammy-updates multiverse
+
+## N.B. software from this repository may not have been tested as
+## extensively as that contained in the main release, although it includes
+## newer versions of some applications which may provide useful features.
+## Also, please note that software in backports WILL NOT receive any review
+## or updates from the Ubuntu security team.
+deb http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
+# deb-src http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
+
+deb http://security.ubuntu.com/ubuntu/ jammy-security main restricted
+# deb-src http://security.ubuntu.com/ubuntu/ jammy-security main restricted
+deb http://security.ubuntu.com/ubuntu/ jammy-security universe
+# deb-src http://security.ubuntu.com/ubuntu/ jammy-security universe
+deb http://security.ubuntu.com/ubuntu/ jammy-security multiverse
+# deb-src http://security.ubuntu.com/ubuntu/ jammy-security multiverse
+
+
+
+apt-get install unattended-upgrades -y	
+unattended-upgrade -d
+SecRule REMOTE_ADDR "@ipMatch 192.0.2.1,192.0.2.2,198.51.100.0/24" "phase:1,id:200000001,nolog,allow
+
+cat /var/log/modsec_audit.log|  grep -o -P '(?<="transaction":).*(?="response":{)' > /tmp/a.txt
+
+import json
+
+with open('/tmp/a.txt') as f:
+    lines = [line.rstrip() for line in f]
+for a in lines:
+    #a = a[:-2]
+    request = a.split(',')[6].split(':')[2].replace('"','')
+    print('request: %s' % request)
+    if 'POST' in request:
+        body = a.split(',')[-2]
+        print(body)
+    print('------------------------------------------')
+
+
+
+
+
+https://docs.nginx.com/nginx-waf/admin-guide/nginx-plus-modsecurity-waf-installation-logging/
+https://cs.nginx.com/repo_setup?_ga=2.143670773.1114170449.1696326563-2067072456.1695807221
+apt install software-properties-common
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+apt update
+apt install vim lsof telnet systemctl curl
+git clone https://github.com/coreruleset/modsecurity-crs-docker.git
+
+export NGINX_VERSION="1.18.0"
+export MODSEC_VERSION=3.0.8
+export LMDB_VERSION=0.9.29
+
+set -eux; \
+    echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections; \
+    apt-get update -qq; \
+    LD_LIBRARY_PATH="" apt-get install -y -qq --no-install-recommends --no-install-suggests \
+        automake \
+        cmake \
+        doxygen \
+        g++ \
+        git \
+        libcurl4-gnutls-dev \
+        libfuzzy-dev \
+        libgeoip-dev \
+        liblua5.3-dev \
+        libpcre3-dev \
+        libpcre2-dev \
+        libtool \
+        libxml2-dev \
+        libyajl-dev \
+        make \
+        patch \
+        pkg-config \
+        ruby \
+        zlib1g-dev; \
+     apt-get clean; \
+     rm -rf /var/lib/apt/lists/*
+	 
+	 mkdir /sources
+	 cd /sources
+	 
+	 set -eux; \
+    git clone https://github.com/LMDB/lmdb --branch LMDB_${LMDB_VERSION} --depth 1; \
+    make -C lmdb/libraries/liblmdb install; \
+    strip /usr/local/lib/liblmdb*.so*
+	
+	set -eux; \
+    git clone https://github.com/SpiderLabs/ModSecurity --branch v"${MODSEC_VERSION}" --depth 1 --recursive; \
+    cd ModSecurity; \
+    ARCH=$(gcc -print-multiarch); \
+    sed -ie "s/i386-linux-gnu/${ARCH}/g" build/ssdeep.m4; \
+    sed -ie "s/i386-linux-gnu/${ARCH}/g" build/pcre2.m4; \
+    ./build.sh; \
+    ./configure --with-yajl --with-ssdeep --with-geoip --with-pcre2 --enable-silent-rules; \
+    make install; \
+    strip /usr/local/modsecurity/lib/lib*.so*
+	
+	export NGINX_VERSION="1.18.0"
+	export MODSEC_VERSION=3.0.8
+	export LMDB_VERSION=0.9.29
+	 cd /sources
+	 rm -rf ModSecurity-nginx
+	mkdir /etc/nginx/modules/
+	
+	set -eux; \
+    git clone -b master --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git; \
+    curl -sSL https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz -o nginx-${NGINX_VERSION}.tar.gz; \
+    tar -xzf nginx-${NGINX_VERSION}.tar.gz; \
+    cd ./nginx-${NGINX_VERSION}; \
+    ./configure --with-compat --add-dynamic-module=../ModSecurity-nginx; \
+    make modules; \
+    strip objs/ngx_http_modsecurity_module.so; \
+    cp objs/ngx_http_modsecurity_module.so /etc/nginx/modules/; \
+    mkdir /etc/modsecurity.d; \
+    curl -sSL https://raw.githubusercontent.com/SpiderLabs/ModSecurity/v3/master/modsecurity.conf-recommended \
+         -o /etc/modsecurity.d/modsecurity.conf; \
+    curl -sSL https://raw.githubusercontent.com/SpiderLabs/ModSecurity/v3/master/unicode.mapping \
+         -o /etc/modsecurity.d/unicode.mapping
+		 
+		 
+	cd /sources
+	set -eux; \
+    mkdir -p /usr/share/TLS; \
+    curl -sSL https://ssl-config.mozilla.org/ffdhe2048.txt -o /usr/share/TLS/dhparam-2048.pem; \
+    curl -sSL https://ssl-config.mozilla.org/ffdhe4096.txt -o /usr/share/TLS/dhparam-4096.pem
+	
+	export CRS_RELEASE='nginx:1.18.0'
+		 
+	set -eux; \
+    apt-get update; \
+    apt-get -y install --no-install-recommends \
+      ca-certificates \
+      curl \
+	  unzip \
+      gnupg; \
+    mkdir /opt/owasp-crs; 
+	cp /tmp/owasp-crs.zip /opt/owasp-crs/
+	unzip owasp-crs.zip
+
+export  MODSEC_VERSION=3.0.8 
+export    LMDB_VERSION=0.9.29
+export ACCESSLOG=/var/log/nginx/access.log \
+export    BACKEND=http://172.17.0.3:80 \
+export    DNS_SERVER= \
+export    ERRORLOG=/var/log/nginx/error.log \
+export    LOGLEVEL=warn \
+export    METRICS_ALLOW_FROM='127.0.0.0/24' \
+export    METRICS_DENY_FROM='all' \
+export    METRICSLOG=/dev/null \
+export    MODSEC_AUDIT_ENGINE="RelevantOnly" \
+export    MODSEC_AUDIT_LOG_FORMAT=JSON \
+export    MODSEC_AUDIT_LOG_TYPE=Serial \
+export    MODSEC_AUDIT_LOG=/dev/stdout \
+export    MODSEC_AUDIT_LOG_PARTS='ABIJDEFHZ' \
+export    MODSEC_AUDIT_STORAGE=/var/log/modsecurity/audit/ \
+export    MODSEC_DATA_DIR=/tmp/modsecurity/data \
+export    MODSEC_DEBUG_LOG=/dev/null \
+export    MODSEC_DEBUG_LOGLEVEL=0 \
+export    MODSEC_DEFAULT_PHASE1_ACTION="phase:1,pass,log,tag:'\${MODSEC_TAG}'" \
+export    MODSEC_DEFAULT_PHASE2_ACTION="phase:2,pass,log,tag:'\${MODSEC_TAG}'" \
+export    MODSEC_PCRE_MATCH_LIMIT_RECURSION=100000 \
+export    MODSEC_PCRE_MATCH_LIMIT=100000 \
+export    MODSEC_REQ_BODY_ACCESS=on \
+export    MODSEC_REQ_BODY_LIMIT=13107200 \
+export    MODSEC_REQ_BODY_LIMIT_ACTION="Reject" \
+export    MODSEC_REQ_BODY_JSON_DEPTH_LIMIT=512 \
+export    MODSEC_REQ_BODY_NOFILES_LIMIT=131072 \
+export    MODSEC_RESP_BODY_ACCESS=on \
+export    MODSEC_RESP_BODY_LIMIT=1048576 \
+export    MODSEC_RESP_BODY_LIMIT_ACTION="ProcessPartial" \
+export    MODSEC_RESP_BODY_MIMETYPE="text/plain text/html text/xml" \
+export    MODSEC_RULE_ENGINE=on \
+export    MODSEC_STATUS_ENGINE="Off" \
+export    MODSEC_TAG=modsecurity \
+export    MODSEC_TMP_DIR=/tmp/modsecurity/tmp \
+export    MODSEC_TMP_SAVE_UPLOADED_FILES="on" \
+export    MODSEC_UPLOAD_DIR=/tmp/modsecurity/upload \
+export    PORT=80 \
+export    NGINX_ALWAYS_TLS_REDIRECT=off \
+export    SET_REAL_IP_FROM="127.0.0.1" \
+export    REAL_IP_HEADER="X-REAL-IP" \
+export    REAL_IP_PROXY_HEADER="X-REAL-IP" \
+export    REAL_IP_RECURSIVE="on" \
+export    PROXY_TIMEOUT=60s \
+export    PROXY_SSL_CERT=/etc/nginx/conf/server.crt \
+export    PROXY_SSL_CERT_KEY=/etc/nginx/conf/server.key \
+export    PROXY_SSL_DH_BITS=2048 \
+export    PROXY_SSL_PROTOCOLS="TLSv1.2 TLSv1.3" \
+export    PROXY_SSL_CIPHERS="ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384" \
+export    PROXY_SSL_PREFER_CIPHERS=off \
+export    PROXY_SSL_VERIFY=off \
+export    PROXY_SSL_OCSP_STAPLING=off \
+export    SERVER_NAME=localhost \
+export    SSL_PORT=443 \
+export    TIMEOUT=60s \
+export    WORKER_CONNECTIONS=1024 \
+export    LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib \
+export    NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx \
+export    # overridden variables
+export    USER=nginx \
+export    # CRS specific variables
+export    PARANOIA=1 \
+export    ANOMALY_INBOUND=5 \
+export    ANOMALY_OUTBOUND=4 \
+export    BLOCKING_PARANOIA=1
+
+cd modsecurity-crs-docker/
+mkdir -p /etc/nginx/templates/modsecurity.d/
+mkdir -p /etc/nginx/templates/modsecurity.d/
+cd /source/
+cp  src/etc/modsecurity.d/modsecurity-override.conf /etc/nginx/templates/modsecurity.d/modsecurity-override.conf.template
+cp  src/etc/modsecurity.d/setup.conf /etc/nginx/templates/modsecurity.d/setup.conf.template
+cp  nginx/docker-entrypoint.d/*.sh /docker-entrypoint.d/
+cp  src/opt/modsecurity/activate-plugins.sh /docker-entrypoint.d/94-activate-plugins.sh
+cp  src/opt/modsecurity/activate-rules.sh /docker-entrypoint.d/95-activate-rules.sh
+cp src/etc/modsecurity.d/modsecurity-override.conf /etc/nginx/templates/modsecurity.d/modsecurity-override.conf.template
+
+cp -rp  nginx/templates /etc/nginx/templates/
+cp src/bin/* /usr/local/bin/
+useradd nginx
+
+
+
+
+
+
+
+
+
+SERVER_NAME=localhost
+MODSEC_RULE_ENGINE=on
+PROXY_TIMEOUT=60s
+MODSEC_PCRE_MATCH_LIMIT_RECURSION=1000
+ANOMALY_OUTBOUND=5
+MODSEC_RESP_BODY_LIMIT=524288
+GROUP=daemon
+STATIC_EXTENSIONS=/.jpg/ /.jpeg/ /.png/ /.gif/
+HOSTNAME=8d17801d165a
+METRICS_ALLOW_FROM=127.0.0.0/24
+MODSEC_AUDIT_LOG_PARTS=ABIJDEFHZ
+ACCESSLOG=/var/log/nginx/access.log
+MODSEC_STATUS_ENGINE=Off
+MODSEC_DEFAULT_PHASE1_ACTION=phase:1,pass,log,tag:'${MODSEC_TAG}'
+PROXY_SSL_PROTOCOLS=TLSv1.2 TLSv1.3
+PROXY_SSL_CERT=/etc/nginx/conf/server.crt
+REAL_IP_PROXY_HEADER=X-REAL-IP
+MODSEC_REQ_BODY_LIMIT_ACTION=Reject
+MODSEC_DEBUG_LOGLEVEL=0
+MAX_NUM_ARGS=128
+TOTAL_ARG_LENGTH=6400
+MODSEC_AUDIT_ENGINE=RelevantOnly
+PWD=/
+PARANOIA=1
+PORT=80
+ENFORCE_BODYPROC_URLENCODED=1
+SET_REAL_IP_FROM=127.0.0.1
+METRICS_DENY_FROM=all
+MODSEC_TMP_SAVE_UPLOADED_FILES=on
+METRICSLOG=/dev/null
+BACKEND=http://172.17.0.3:80
+NGINX_ALWAYS_TLS_REDIRECT=off
+PKG_RELEASE=1~bullseye
+RESTRICTED_EXTENSIONS=.cmd/ .com/ .config/ .dll/
+HOME=/root
+ARG_LENGTH=200
+VALIDATE_UTF8_ENCODING=1
+BLOCKING_PARANOIA=1
+ARG_NAME_LENGTH=50
+ALLOWED_REQUEST_CONTENT_TYPE=text/xml|application/xml|text/plain
+REAL_IP_HEADER=X-REAL-IP
+MODSEC_TAG=modsecurity
+MODSEC_TMP_DIR=/tmp/modsecurity/tmp
+MODSEC_AUDIT_LOG_FORMAT=JSON
+MODSEC_REQ_BODY_LIMIT=13107200
+MODSEC_AUDIT_LOG_TYPE=Serial
+PROXY=1
+MODSEC_REQ_BODY_JSON_DEPTH_LIMIT=512
+ALLOWED_REQUEST_CONTENT_TYPE_CHARSET=utf-8|iso-8859-1
+PROXY_SSL_VERIFY=off
+PROXY_SSL_DH_BITS=2048
+MODSEC_UPLOAD_DIR=/tmp/modsecurity/upload
+ALLOWED_HTTP_VERSIONS=HTTP/1.1 HTTP/2 HTTP/2.0
+NJS_VERSION=0.7.12
+TERM=xterm
+SERVER_ADMIN=root@localhost
+WORKER_CONNECTIONS=1024
+USER=www-data
+MODSEC_DEBUG_LOG=/dev/null
+MODSEC_PCRE_MATCH_LIMIT=1000
+SHLVL=1
+REAL_IP_RECURSIVE=on
+TIMEOUT=60
+RESTRICTED_HEADERS=/proxy/ /if/
+CRS_ENABLE_TEST_MARKER=1
+ANOMALY_INBOUND=10
+NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx
+MODSEC_REQ_BODY_NOFILES_LIMIT=131072
+LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib
+ERRORLOG=/proc/self/fd/2
+MODSEC_RESP_BODY_ACCESS=on
+MODSEC_AUDIT_LOG=/dev/stdout
+MODSEC_DEFAULT_PHASE2_ACTION=phase:2,pass,log,tag:'${MODSEC_TAG}'
+SSL_PORT=443
+PROXY_SSL_PREFER_CIPHERS=off
+MODSEC_RESP_BODY_MIMETYPE=text/plain text/html text/xml
+PROXY_SSL_OCSP_STAPLING=off
+ALLOWED_METHODS=GET POST PUT
+PROXY_SSL_CIPHERS=ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EXECUTING_PARANOIA=2
+MODSEC_DATA_DIR=/tmp/modsecurity/data
+NGINX_VERSION=1.24.0
+COMBINED_FILE_SIZES=1000000
+DNS_SERVER=
+PROXY_SSL_CERT_KEY=/etc/nginx/conf/server.key
+PROXY_SSL=on
+MAX_FILE_SIZE=100000
+MODSEC_RESP_BODY_LIMIT_ACTION=ProcessPartial
+MODSEC_REQ_BODY_ACCESS=on
+MODSEC_AUDIT_STORAGE=/var/log
+LOGLEVEL=warn
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		 
+		 
+		 
+		 
+		 
+		 
+		 
+		 
