@@ -1,4 +1,4 @@
-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
+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
 
 reset các user mặc định
 apply new sshd config 
